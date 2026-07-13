@@ -37,28 +37,44 @@ class FlatFileManager:
             json.dump(self.conversations_index, file, indent=2)
 
 
-    def get_conversation(self, conversation_id: str) -> List[any]:
+    def get_conversation(self, conversation_id: str, thread_id: str) -> List[any]:
+        threads = self.load_threads(conversation_id)
+        return threads.get(thread_id, [])
+
+
+    def list_threads(self, conversation_id: str) -> List[str]:
+        threads = self.load_threads(conversation_id)
+        return sorted(threads.keys())
+    
+
+    def load_threads(self, conversation_id: str) -> dict:
         relative_filepath = self.conversations_index.get(conversation_id)
         if not relative_filepath:
-            return []
+            return {}
         
         filepath = os.path.join(self.storage_dir, relative_filepath)
+        if not os.path.exists(filepath):
+            return {}
 
         try:
             with open(filepath, "r") as file:
                 return json.load(file)
         except:
-            print("There was an error loading conversation.")
-            return []
-
-
-    def save_conversation(self, conversation_id: str, relative_filepath: str, messages: List[any]) -> None:
+            print("There was an error loading conversations.")
+            return {}
+        
+        
+    def save_conversation(self, conversation_id: str, relative_filepath: str, thread_id: str, messages: List[any]) -> None:
         self.conversations_index[conversation_id] = relative_filepath
         self.save_index()
         
+        threads = self.load_threads(conversation_id)
+        threads[thread_id] = messages
+
         filepath = os.path.join(self.storage_dir, relative_filepath)
         with open(filepath, "w") as file:
-            json.dump(messages, file, indent=2)
+            json.dump(threads, file, indent=2)
+
 
 
     def run_tests(self):
