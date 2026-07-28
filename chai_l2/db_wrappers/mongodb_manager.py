@@ -83,15 +83,15 @@ class MongoDBManager:
             message (Dict): A single message dictionary to append
         """
         conversation_id = f"{user_id}_{thread_name}"
-        now = datetime.now(UTC).isoformat()
+        currentTime = datetime.now(UTC).isoformat()
 
         update = {
-            "$push": {"messages": messages},
-            "$set": {"updated_at": now},
+            "$push": {"message": message},
+            "$set": {"updated_at": currentTime},
             "$setOnInsert": {
                 "user_id": user_id,
                 "thread_name": thread_name,
-                "created_at": now
+                "created_at": currentTime
             }
         }
 
