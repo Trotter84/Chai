@@ -33,20 +33,34 @@ def main():
 
     threads = db_manager.list_user_threads(user_id) 
 
-    for i, thread_name in enumerate(threads):
-        print(f"{i}. {thread_name}")
-    print(f"{len(threads)}. Create new thread")
-    user_selection = input("Enter a thread number:")
+    options = "\n\tEnter a thread number\n\tType '/search' <keyword> to find a message.\n\tType '/help' to show these options.\n"
+    print(options)
 
-    if not user_selection.isdigit():
-        print("Not a number, exiting")
-        return
+    while True:
+        for i, thread_name in enumerate(threads):
+            print(f"{i}. {thread_name}")
+        print(f"{len(threads)}. Create new thread")
+        user_selection = input("> ")
 
-    choice = int(user_selection)
+        if user_selection.lower().startswith('/search'):
+            search_chat(db_manager, user_id, user_selection)
+            continue
 
-    if choice > len(threads):
-        print("Selection is too large of a number")
-        return
+        elif user_selection.lower() == '/help':
+            print(options)
+            continue
+        
+        if not user_selection.isdigit():
+            print("Not a number, exiting")
+            return
+
+        choice = int(user_selection)
+
+        if choice > len(threads):
+            print("Selection is too large of a number")
+            continue
+
+        break
 
     thread_name = ""
     if not threads or choice == len(threads):
@@ -62,6 +76,24 @@ def main():
     db_manager.close()
 
 
+def search_chat(db_manager: MongoDBManager, user_id: str, user_input: str) -> None:
+            split_input = user_input.split(maxsplit=1)
+            if len(split_input) < 2 or not split_input[1].strip():
+                print("Usage: /search <keyword>")
+                return
+
+            query = split_input[1].strip()
+            results = db_manager.search_messages(user_id, query)
+
+            if not results:
+                print(f"I could not find any matches for: " + query.uppercase() + "\n")
+                return
+            
+            for match in results:
+                role = match['role'].capitalize()
+                print(f"[Thread Name: {match['thread_name']}]\n\t{role}: \"{match['content']}\"\n")
+                
+
 def run_chat(db_manager: MongoDBManager, user_id: str, thread_name: str) -> None:
     """
     Runs the chat loop for a specific conversation thread.
@@ -76,15 +108,22 @@ def run_chat(db_manager: MongoDBManager, user_id: str, thread_name: str) -> None
         for message in messages:
             role = message['role'].capitalize()
             print(f"{role}: {message['content']}")
-        print(f"Load time: {duration:.4f} seconds\n")
+        print(f"Load time: {duration:.4f} seconds")
 
-    print(f"Conversation: '{thread_name}'. Type 'exit' to quit.")
+        options = f"\nConversation: '{thread_name}'.\n\tType 'exit' to quit.\n\tType '/search' <keyword> to find a message.\n\tType '/help' to show these options.\n\tOr start chatting.\n"
+        print(options)
 
     while True:
         user_input = input("> ")
         if user_input.lower() == 'exit':
             print("Goodbye!")
             break
+        if user_input.lower().startswith('/search'):
+            search_chat(db_manager, user_id, user_input)
+            continue
+        if user_input.lower() == '/help':
+            print(options)
+            continue
 
         start_time = time.perf_counter()
 
@@ -95,7 +134,7 @@ def run_chat(db_manager: MongoDBManager, user_id: str, thread_name: str) -> None
         # Create and append AI response
         ai_response = "This is a mock response from the AI."
         ai_message = {"role": "assistant", "content": ai_response}
-        db_manager.append_message(user_id, thread_name, ai_response)
+        db_manager.append_message(user_id, thread_name, ai_message)
 
         end_time = time.perf_counter()
         duration = end_time - start_time

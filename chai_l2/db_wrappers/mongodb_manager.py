@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, UTC
+import re
 from typing import List, Dict, Optional
 from pymongo import MongoClient
 from pymongo.collection import Collection
@@ -86,7 +87,7 @@ class MongoDBManager:
         currentTime = datetime.now(UTC).isoformat()
 
         update = {
-            "$push": {"message": message},
+            "$push": {"messages": message},
             "$set": {"updated_at": currentTime},
             "$setOnInsert": {
                 "user_id": user_id,
@@ -115,6 +116,32 @@ class MongoDBManager:
         for record in matches:
             thread_names.append(record["thread_name"])
         return thread_names
+
+    def search_messages(self, user_id: str, query: str) -> List[Dict]:
+        if not query:
+            return []
+
+        regex_pattern = r"\b" + re.escape(query) + r"\b"
+
+        results = [
+            {"$match": {
+                "user_id": user_id,
+                "messages.content": {"$regex": regex_pattern, "$options": "i"}
+            }},
+            {"$unwind": "$messages"},
+            {"$match": {
+                "messages.content": {"$regex": regex_pattern, "$options": "i"}
+            }},
+            {"$project": {
+                "_id": 0,
+                "thread_name": 1,
+                "role": "$messages.role",
+                "content": "$messages.content"
+            }}
+        ]
+
+        return list(self.conversations.aggregate(results))
+        
 
     def delete_conversation(self, user_id: str, thread_name: str) -> bool:
         """
@@ -145,6 +172,7 @@ class MongoDBManager:
         """
         self.conversations.delete_many({})
 
+        
 
 # Test code
 if __name__ == "__main__":
